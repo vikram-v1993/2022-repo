@@ -1,0 +1,167 @@
+import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv('Heart_disease.csv')
+
+df.head()
+
+df.CVD.value_counts()/len(df)*100
+
+df.dtypes
+
+df['currentSmoker'] = df['currentSmoker'].astype('object')
+
+df['BPMeds'] = df['BPMeds'].astype('object')
+
+df['prevalentStroke'] = df['prevalentStroke'].astype('object')
+
+df['prevalentHyp'] = df['prevalentHyp'].astype('object')
+
+df['diabetes'] = df['diabetes'].astype('object')
+
+df['CVD'] = df['CVD'].astype('object')
+
+df.describe()
+
+df.isnull().sum()
+
+
+df_cat = df.select_dtypes('O')
+df_num = df.select_dtypes(np.number)
+
+
+
+df_cat.isnull().sum()
+
+
+
+from sklearn.impute import SimpleImputer
+
+si = SimpleImputer(strategy = 'most_frequent').fit_transform(df_cat.values)
+df_cat = pd.DataFrame(si,columns = df_cat.columns,index = df_cat.index)
+
+df_cat.isnull().sum()
+
+df_num.isnull().sum()
+
+from sklearn.impute import SimpleImputer
+
+sim = SimpleImputer(strategy = 'median').fit_transform(df_num.values)
+df_num = pd.DataFrame(sim,columns = df_num.columns,index = df_num.index)
+
+df_num.isnull().sum()
+
+from sklearn.preprocessing import StandardScaler
+
+ss = StandardScaler().fit_transform(df_num.values)
+
+df_num = pd.DataFrame(ss,index = df_num.index,columns = df_num.columns)
+
+
+df_num.describe()
+
+df = pd.concat([df_num,df_cat],axis = 1)
+
+df.isnull().sum()
+
+q1 = df.quantile(0.25)
+
+q3 = df.quantile(0.75)
+
+iqr = q3 - q1
+
+
+df= df[~((df < (q1 - 1.5 * iqr))| (df > (q3 + 1.5 * iqr))).any(axis = 1)]
+
+df.shape
+
+plt.figure(figsize = (15,8))
+df['CVD'] = df['CVD'].astype('int')
+sns.heatmap(df.corr(),annot = True,cmap="YlGnBu")
+
+
+x = df.drop('CVD',axis = 1)
+x = pd.get_dummies(x,drop_first= True)
+
+vif = pd.DataFrame()
+
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+vif['vif_factor'] = [variance_inflation_factor(x.values,i) for i in range(x.shape[1])]
+
+vif['features'] = x.columns
+
+high_mc = vif.sort_values('vif_factor',ascending = False)
+
+high_mc
+
+from sklearn.ensemble import GradientBoostingClassifier
+
+from sklearn.model_selection import train_test_split
+
+from sklearn.metrics import accuracy_score
+
+x = df.drop(['CVD','sysBP'],axis = 1)
+x = pd.get_dummies(x,drop_first = True)
+
+y = df['CVD']
+
+x_train,x_test,y_train,y_test = train_test_split(x,y,test_size = 0.3)
+
+
+
+gbc = GradientBoostingClassifier()
+
+model = gbc.fit(x_train,y_train)
+
+print('TRAIN ACCURACY',model.score(x_train,y_train))
+print('TEST ACCURACY',model.score(x_test,y_test))
+
+from sklearn.metrics import classification_report
+
+y_pred = model.predict(x_test)
+
+print(classification_report(y_test,y_pred))
+
+from sklearn.model_selection import GridSearchCV
+
+tuned_params = [{"n_estimators":[5,50,250,500],
+    "max_depth":[1,3,5,7,9],
+    "learning_rate":[0.01,0.1,1,10,100]}]
+
+grid = GridSearchCV(estimator = gbc,param_grid = tuned_params,cv = 2)
+
+
+
+
+
+grid.fit(x_train,y_train)
+
+
+
+best = grid.best_params_
+best
+
+gbc = GradientBoostingClassifier(learning_rate = 0.1, max_depth = 1, n_estimators = 5)
+model_tuned = gbc.fit(x_train,y_train)
+
+print('TRAIN ACCURACY',model_tuned.score(x_train,y_train))
+print('TEST ACCURACY',model_tuned.score(x_test,y_test))
+
+y_pred = model_tuned.predict(x_test)
+
+print(classification_report(y_test,y_pred))
+
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_auc_score,roc_curve
+
+roc_auc_score(y_test,y_pred)
+
+
+
+
+
