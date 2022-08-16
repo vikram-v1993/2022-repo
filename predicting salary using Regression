@@ -1,0 +1,318 @@
+# SLR FINAL EXAM
+
+### DATA DESCRIPTION: 
+The data set consists of complete educational details of students right from their
+schooling to MBA and previous work experience. Our main objective is to predict the Salary of the students
+based on the info available. The data set consists of 391 observations and 19 variables.
+
+### ATTRIBUTES:
+
+SlNo - ID of the student
+
+Gender - Gender of Student
+
+Percent_SSC - Percentage of marks scored in SSC
+
+Board_SSC - Types of Boards in SSC
+
+
+Percent_HSC - Percentage of marks scored in HSC
+
+Board_HSC - Types of Boards in HSC
+
+Stream_HSC - Specialization in HSC
+
+Percent Degree - Percentage of marks scored in Degree
+
+Course_Degree - Different courses in degree
+
+Experience_Yrs - Work Experience of the Students
+
+Entrance_Test - Test which students give for MBA college Entrance
+
+Percentile_ET - Percentage of marks scored in Entrance_Test
+
+
+Percent_MBA - Percentage of marks scored in MBA
+
+Specialization_MBA - Specialization in MBA
+
+Marks Communication - Percentage of marks scored in Communication
+
+Marks_Projectwork - Percentage of marks scored in Project Work
+
+
+Marks_BOCA - Percentage of marks scored by students in Extra Curricular
+
+activities
+
+Placement - Whether Student got placed or not
+
+
+Salary - Salary of students
+
+
+
+### 1.	 Read the dataset (tab, csv, xls, txt, inbuilt dataset) 
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+warnings.filterwarnings('ignore')
+plt.rcParams['figure.figsize']=15,8
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import StandardScaler
+from scipy.stats import shapiro
+from scipy.stats import ttest_ind
+from scipy.stats import probplot
+import statsmodels.api as sm
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.stats.stattools import durbin_watson
+from statsmodels.stats.diagnostic import linear_rainbow
+from sklearn.feature_selection import RFE
+from mlxtend.feature_selection import SequentialFeatureSelector as sfs
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import Lasso
+from sklearn.linear_model import ElasticNet
+
+
+
+
+
+## Kindly change the below cells from markdown to code and execute it 
+
+import pandas as pd
+
+import csv
+
+with open("data_set.csv","r")as file:
+    
+    reader=csv.reader(file)
+
+df=pd.read_csv("data_set.csv")
+
+df.head()
+
+
+df=pd.read_excel('Admission.xlsx')
+df.head()
+
+### 2.	Summarize important observations from the data set (5 Marks)
+
+Some pointers which would help you, but don’t be limited by these
+
+a.	What are the number of rows; no. & types of variables (continuous, categorical etc.)
+
+b.	Calculate five point summary for numerical variables
+
+c.	Summarize observations for categorical variables – no. of categories, % observations in each category
+
+
+df.shape
+
+df_num=df.select_dtypes(np.number)
+df_num.columns
+
+df_cat=df.select_dtypes('object')
+df_cat.columns
+
+df.describe()
+
+df['Gender'].value_counts()/len(df)*100
+
+df['Board_SSC'].value_counts()/len(df)*100
+
+df['Board_HSC'].value_counts()/len(df)*100
+
+df['Stream_HSC'].value_counts()/len(df)*100
+
+df['Course_Degree'].value_counts()/len(df)*100
+
+df['Entrance_Test'].value_counts()/len(df)*100
+
+df['Specialization_MBA'].value_counts()/len(df)*100
+
+df['Placement'].value_counts()/len(df)*100
+
+df.shape
+
+df.dtypes
+
+### 3.	Check for defects in the data. Perform necessary actions to ‘fix’ these defects (5 Marks)
+
+Some pointers which would help you, but don’t be limited by these
+
+a.	Do variables have missing/null values?
+
+b.	Do variables have outliers?
+
+c.	Is the data normally distributed? Is it a defect? Why or why not? 
+
+
+df.isnull().sum()
+
+SI=SimpleImputer(strategy='most_frequent').fit_transform(df_cat.values)
+df_cat=pd.DataFrame(SI,index=df_cat.index,columns=df_cat.columns)
+
+SS=StandardScaler().fit_transform(df_num.values)
+df_num=pd.DataFrame(SS,index=df_num.index,columns=df_num.columns)
+
+df=pd.concat([df_num,df_cat],axis=1)
+df.describe()
+
+df.head()
+
+df.isnull().sum()
+
+fig,ax=plt.subplots(nrows=4,ncols=3)
+for i,j in zip(df_num.columns,ax.flatten()):
+    sns.boxplot(df_num[i],ax=j)
+plt.show()
+
+q1=df_num.quantile(0.25)
+q3=df_num.quantile(0.75)
+iqr=q3-q1
+
+df=df[~((df_num<(q1-1.5*iqr))|(df_num>(q3+1.5*iqr))).any(axis=1)]
+
+df.shape
+
+sns.distplot(df['Salary'])
+
+df['Salary'].skew()
+
+df.hist()
+
+df.skew()
+
+### 4.	Summarize relationships among variables (10 marks)  
+
+a.	Plot correlation plots. Which are the variables most correlated with Target? Which independent variables are correlated among themselves? Do you want to exclude some variables from the model based on this analysis? What other actions will you take?
+
+b.	Plot all independent variables with the target. Are all relationships linear? If not, what steps would you take based on this information?
+
+ Hint: based on your observations you may want to transform features or create additional features.
+
+
+sns.heatmap(df.corr(),annot=True)
+
+fig,ax=plt.subplots(nrows=4,ncols=3)
+for i,j in zip(df_num.columns,ax.flatten()):
+    sns.scatterplot(df_num[i],df['Salary'],ax=j)
+plt.show()
+
+### 5.	Split dataset into train and test (70:30) (5 marks)
+
+a.	Are both train and test representative of the overall data? How would you ascertain this statistically?
+
+
+x=df.drop(['Salary'],axis=1)
+x=pd.get_dummies(x,drop_first=True)
+x=sm.add_constant(x)
+y=df['Salary']
+
+x_train,x_test,y_train,y_test=train_test_split(x,y,test_size=0.3,random_state=10)
+
+print(ttest_ind(x_train,x_test))
+
+print(ttest_ind(y_train,y_test))
+
+### 6.	Fit a base model. Please write your key observations (15 marks) 
+
+a.	What is the overall R2? Please comment on whether it is good or not.
+
+b.	What is the adjusted R2? Is it different from R2? Why?
+
+c.	Which variables are significant?
+
+d.	Is there multicollinearity?
+
+e.	Which other key model output parameters do you want to look at? 
+
+
+model=sm.OLS(y_train,x_train).fit()
+
+model.summary()
+
+y_train_pred=model.predict(x_train)
+y_test_pred=model.predict(x_test)
+mse_train=mean_squared_error(y_train,y_train_pred)
+mse_test=mean_squared_error(y_test,y_test_pred)
+rmse_train=np.sqrt(mse_train)
+rmse_test=np.sqrt(mse_test)
+print(rmse_train)
+
+print(rmse_test)
+
+
+pvalue=pd.DataFrame(model.pvalues,columns=['pvalues'])
+
+significant_variables=pvalue[pvalue['pvalues']<0.05]
+significant_variables
+
+significant_variables=significant_variables.index.to_list
+
+significant_variables
+
+shapiro(model.resid)
+
+
+
+
+
+
+
+### 7.	How do you improve the accuracy of the model? Write clearly the changes that you will make before re-fitting the model. Fit the final model. (20 marks)
+Please feel free to have any number of iterations to get to the final answer. Marks are awarded based on the quality of final model you are able to achieve. 
+
+
+vif=pd.DataFrame()
+vif['features']=x.columns
+vif['vif']=[variance_inflation_factor(x.values,i) for i in range(x.shape[1])]
+vif.sort_values('vif',ascending=False).head()
+
+x_vif=x.drop(['Course_Degree_Management','Course_Degree_Commerce','SlNo'],axis=1)
+x_vif
+
+x_vif_train,x_vif_test,y_train,y_test=train_test_split(x_vif,y,test_size=0.3,random_state=10)
+
+vif_model=sm.OLS(y_train,x_vif_train).fit()
+
+
+vif_model.summary()
+
+sfs_backward=sfs(estimator=LinearRegression(),k_features=5,forward=False,verbose=2,scoring='r2')
+
+sfs_backward.fit(x_vif_train,y_train)
+
+features=sfs_backward.k_feature_names_
+
+features=list(features)
+
+x_final=x[features]
+x_final=sm.add_constant(x_final)
+
+x_final_train,x_final_test,y_train,y_test=train_test_split(x_final,y,test_size=0.3,random_state=10)
+
+final_model=sm.OLS(y_train,x_final_train).fit()
+
+final_model.summary()
+
+### 8.	Summarize as follows (10 marks) 
+
+1.	Summarize the overall fit of the model and list down the measures to prove that it is a good model
+2.	Write down a business interpretation/explanation of the model – which variables are affecting the target the most and explain the relationship. Feel free to use charts or graphs to explain.
+3.	What changes from the base model had the most affect on model performance
+4.	What are the key risks to your results and interpretation
+
+
+df_new=pd.concat([x_final,y],axis=1)
+
+sns.heatmap(df_new.corr(),annot=True)
+
