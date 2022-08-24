@@ -1,0 +1,565 @@
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+
+from warnings import filterwarnings
+filterwarnings('ignore')
+
+
+# 1 - data description
+
+df1 = pd.read_csv('complaints.csv')
+
+
+df = df1.copy()
+df.shape
+
+df.head()
+
+# percentage of null values
+
+plt.figure(figsize = (15,8))
+(df.isnull().sum() /len(df) * 100).plot(kind = 'bar')
+plt.xlabel('column names')
+plt.ylabel('count of null values')
+plt.title('visualizing null values')
+
+plt.show()
+
+lis = []
+for i in df.columns: 
+    if df[i].isnull().sum() /len(df) * 100 > 50:
+        lis.append(i)
+    else:
+        None
+    
+print(lis)
+
+# * dropping columns with >50% null values but not customer complaints because that is our independant variable
+
+df.drop(columns = ['Tags','Consumer disputed?','Company public response'],inplace = True)
+
+df.shape
+#columns dropped
+
+df.head()
+
+df.columns
+
+# *dropping columns which gives no value to the Model and the bussiness problem
+
+drop = ['Date received', 'Issue', 'Sub-issue', 'Company',
+       'State', 'ZIP code', 'Consumer consent provided?', 'Submitted via',
+       'Date sent to company', 'Company response to consumer',
+       'Timely response?', 'Complaint ID']
+
+df.drop(columns = drop,inplace = True,axis = 1)
+
+# * again checking for any null values
+
+df.isnull().sum()/len(df) * 100 
+
+# *dropping records where consumer complaints is NaN
+
+nan_index = df[df['Consumer complaint narrative'].isnull()].index
+
+df.drop(index = nan_index,inplace = True)
+
+df.head()
+
+df.columns
+
+df.dropna(how = 'any' ,axis = 0,inplace = True)
+
+#  data - insights
+
+
+df[df['Product'] == 'Debt collection']['Sub-product'].value_counts()
+
+df['Product'].value_counts()
+
+# *Replacing incorrect categories with appropiate names. 
+
+df['Sub-product'].replace(['I do not know'],value = 'Other debt',inplace =True)
+
+df['Sub-product'].replace(['Credit card'],value = 'Credit card debt',inplace =True)
+
+df['Sub-product'].replace(['Medical'],value = 'Medical debt',inplace =True)
+
+# *Dropping all columns except debt collection from products
+
+droppers = df[~(df['Product'] == 'Debt collection')].index
+
+final = df.drop(index = droppers)
+final['Product'].value_counts()
+
+# *In the above cell The Product column is reduced to only one category
+
+sub_index = df[df['Product'] == 'Debt collection']['Sub-product'].value_counts().head(3).index
+
+df['Sub-product'].value_counts().index
+
+emp = []
+for i in df['Sub-product'].value_counts().index:
+    if i not in sub_index:
+        for j in df[df['Sub-product']== i].index:
+            emp.append(j)
+            
+    else:
+        None
+
+        
+
+len(emp)
+
+df.drop(index = emp,axis = 0,inplace = True)
+
+df.head()
+
+# *data is processed by removing NaN values
+
+df.dropna(how = 'any' ,axis = 0,inplace = True)
+
+
+df.isnull().sum()
+
+# *The distribution of dependent variable is visualized
+
+sns.countplot(df['Sub-product'])
+plt.show()
+
+# * we notice that there is a big imbalance between the 3 categories
+
+df
+
+# ** Text cleaning 
+
+
+pd.set_option('display.max_colwidth', -1)
+
+df['Consumer complaint narrative'].head(1)
+
+# * using library NLTK for cleaning text
+
+import nltk
+
+#nltk.download('popular')
+
+# step:1 converting all letters to lower case
+
+df['Consumer complaint narrative'] = [i.lower() for i in df['Consumer complaint narrative']]
+
+
+df['Consumer complaint narrative'].head(1)
+
+# step:2 replacing X with -  ' '
+
+df['Consumer complaint narrative'] = df['Consumer complaint narrative'].str.replace('x','')
+
+
+df['Consumer complaint narrative'].head(1)
+
+# ** resetting index which is not in order
+
+
+df.reset_index(drop = True,inplace = True)
+
+
+# step:3 - filter using regular expression
+
+The noice from the complex text can be removed using the library 'REGULAR EXPRESSIONS'
+
+from nltk.tokenize import word_tokenize
+import string
+import re
+
+
+k = 0
+for i in df['Consumer complaint narrative']:
+    lis = word_tokenize(str(i),language = 'english')
+    listt = []
+    
+    for j in lis:
+        res = re.sub(r'\W','',j)                                    # remove all except alpha numeric chaRacter
+        res = re.sub(r'\d','',res)                                  # removes all numeric
+        res = re.sub('\w_','',res)                                  # removes words with under scores
+        res = re.sub('[!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~]','',res) # removes all punctuations
+        res = re.sub('www.+','',res)                                # removes word starting with 'www.'
+        res = re.sub(r'\w+com','',res)                              #removes words ending with '.com'
+        listt.append(res)
+    sentence = " ".join(listt)
+    
+    df['Consumer complaint narrative'].iloc[k] = sentence
+    k = k+1
+    if k > len(df):
+        break
+    else:
+        continue
+    
+    break
+
+
+
+
+# *passage with only words is below
+
+df['Consumer complaint narrative'].head(1)
+
+# step 4:removing stop words
+
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import string
+import re
+
+
+k = 0
+for i in df['Consumer complaint narrative']:
+    lis = word_tokenize(str(i),language = 'english')
+    list2 = []
+    
+    for j in lis:
+        if not j in stopwords.words('english'):
+            list2.append(j)
+    sentence = " ".join(list2)
+    
+    df['Consumer complaint narrative'].iloc[k] = sentence
+    k = k+1
+    if k > len(df):
+        break
+    else:
+        continue
+    
+
+df['Consumer complaint narrative'].head(1)
+
+# step: 5 - stemming and lemmantization
+
+from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.stem.porter import PorterStemmer
+
+wordnet = WordNetLemmatizer()
+porter = PorterStemmer()
+
+k = 0
+for i in df['Consumer complaint narrative']:
+    lis = word_tokenize(str(i),language = 'english')
+    list3 = []
+    
+    for j in lis:
+        list3.append(wordnet.lemmatize(j))
+        sentence = " ".join(list3)
+        
+    df['Consumer complaint narrative'].iloc[k] = sentence
+    k = k+1
+    if k > len(df):
+        break
+    else:
+        continue
+
+# *making a new data frame as df to use later
+
+df.to_csv('df.csv')
+
+df = pd.read_csv('df.csv',index_col= 0)
+df.head()
+
+df.columns
+
+# encoding target variable
+
+
+from sklearn.preprocessing import LabelEncoder
+
+enc = LabelEncoder()
+
+df['Sub-product'] = enc.fit_transform(df['Sub-product'])
+
+df.head()
+
+df.dropna(how = 'any',inplace = True)
+df.isnull().sum()
+
+plt.figure(figsize = (15,8))
+sns.countplot(x = df['Sub-product'])
+plt.show()
+
+# *Data imbalance is noticed and following under sampling is used to sort the imbalance
+
+y = df['Sub-product']
+X = df.drop(columns = ['Product','Sub-product'],axis = 1)
+
+from imblearn.under_sampling import RandomUnderSampler
+  
+# define dataset
+undersample = RandomUnderSampler()
+x_under, y_under = undersample.fit_resample(X, y)
+  
+# print the features and the labels
+print('x_under:\n', x_under)
+print('y_under:\n', y_under)
+
+mod = pd.concat([x_under,y_under],axis = 1)
+mod
+
+mod.to_csv('mod.csv')
+
+mod = pd.read_csv('mod.csv',index_col= 0)
+
+The new variable 'Mod' is preprocessed dataset that can be given to a model
+
+mod['Sub-product'].value_counts()
+
+plt.figure(figsize = (15,8))
+sns.countplot(mod['Sub-product'])
+plt.show()
+
+TARGET VARIABLE IS BALANCED
+
+# With huge data - vectorization is facing memory error
+
+random sampling the data set with 20000 observations
+
+mod = mod.sample(n = 20000)
+mod['Sub-product'].value_counts()
+
+mod = mod.reset_index(drop = True)
+
+mod.head()
+
+# visualizing the frequently used words in customer complaints.below:
+
+# *wordcloud for credit complaints
+
+comment_words = ''
+stopwords = set(STOPWORDS)
+ 
+# iterate through the csv file
+for val in mod[mod['Sub-product'] == 0]['Consumer complaint narrative']:
+     
+    # typecaste each val to string
+    val = str(val)
+ 
+    # split the value
+    tokens = val.split()
+     
+    # Converts each token into lowercase
+    for i in range(len(tokens)):
+        tokens[i] = tokens[i].lower()
+     
+    comment_words += " ".join(tokens)+" "
+
+from wordcloud import WordCloud, STOPWORDS
+stopwords = set(STOPWORDS)
+wordcloud = WordCloud(width = 800, height = 800,
+                background_color ='white',
+                stopwords = stopwords,
+                min_font_size = 10).generate(comment_words)
+plt.figure(figsize = (8, 8), facecolor = None)
+plt.imshow(wordcloud)
+plt.axis("off")
+plt.tight_layout(pad = 0)
+ 
+plt.show()
+
+# *wordcloud for medical complaints
+
+comment_words = ''
+stopwords = set(STOPWORDS)
+ 
+# iterate through the csv file
+for val in mod[mod['Sub-product'] == 1]['Consumer complaint narrative']:
+     
+    # typecaste each val to string
+    val = str(val)
+ 
+    # split the value
+    tokens = val.split()
+     
+    # Converts each token into lowercase
+    for i in range(len(tokens)):
+        tokens[i] = tokens[i].lower()
+     
+    comment_words += " ".join(tokens)+" "
+
+from wordcloud import WordCloud, STOPWORDS
+stopwords = set(STOPWORDS)
+wordcloud = WordCloud(width = 800, height = 800,
+                background_color ='white',
+                stopwords = stopwords,
+                min_font_size = 10).generate(comment_words)
+plt.figure(figsize = (8, 8), facecolor = None)
+plt.imshow(wordcloud)
+plt.axis("off")
+plt.tight_layout(pad = 0)
+ 
+plt.show()
+
+# *wordcloud for other complaints regarding debt
+
+comment_words = ''
+stopwords = set(STOPWORDS)
+ 
+# iterate through the csv file
+for val in mod[mod['Sub-product'] == 2]['Consumer complaint narrative']:
+     
+    # typecaste each val to string
+    val = str(val)
+ 
+    # split the value
+    tokens = val.split()
+     
+    # Converts each token into lowercase
+    for i in range(len(tokens)):
+        tokens[i] = tokens[i].lower()
+     
+    comment_words += " ".join(tokens)+" "
+
+from wordcloud import WordCloud, STOPWORDS
+stopwords = set(STOPWORDS)
+wordcloud = WordCloud(width = 800, height = 800,
+                background_color ='white',
+                stopwords = stopwords,
+                min_font_size = 10).generate(comment_words)
+plt.figure(figsize = (8, 8), facecolor = None)
+plt.imshow(wordcloud)
+plt.axis("off")
+plt.tight_layout(pad = 0)
+ 
+plt.show()
+
+# vectorization
+
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+import sklearn.feature_extraction.text as text
+
+tfidf_vec= TfidfVectorizer()
+
+X = mod['Consumer complaint narrative']
+y = mod['Sub-product']
+
+x1 = tfidf_vec.fit_transform(X)
+x1.toarray()
+
+x_data = pd.DataFrame(x1.toarray(),columns = tfidf_vec.get_feature_names())
+
+x_data.head()
+
+final = pd.concat([x_data,y],axis = 1)
+
+final['Sub-product'].isnull().sum()
+
+final.head()
+
+final.to_csv('final_vect.csv')
+
+pip install wordcloud
+
+final = pd.read_csv('final_vect.csv')
+
+# train test split 
+
+from sklearn.model_selection import train_test_split
+
+import statsmodels
+import statsmodels.api as sm
+
+X = final.drop(columns='Sub-product')
+y = final['Sub-product']
+
+x_train, x_test,y_train, y_test = train_test_split(X,y,test_size=0.30)
+
+
+
+print(x_train.shape)
+print(x_test.shape)
+print(y_train.shape)
+print(y_test.shape)
+
+# perform random forrest classification
+
+
+from sklearn.metrics import classification_report
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import 
+from sklearn import tree
+from sklearn.model_selection import GridSearchCV
+
+rf_classification = RandomForestClassifier(n_estimators = 10, random_state = 10)
+
+
+rf_model = rf_classification.fit(x_train, y_train)
+
+# train data report
+
+train_pred = rf_model.predict(x_train)
+
+classification_report(y_train,train_pred)
+
+# test data report
+
+test_pred =  rf_model.predict(x_test)
+
+classification_report(y_test,test_pred)
+
+# the result shows that the data is doing well in train set and not in test set.
+
+# *hyper paramter tuning
+
+tuned_paramaters = [{'criterion': ['entropy'],
+                     'n_estimators': [10],
+                     'max_depth': [10],
+                     'min_samples_split': [2],
+                     'min_samples_leaf': [20,30],
+                     'max_leaf_nodes': [10,15]}]
+ 
+
+random_forest_classification = RandomForestClassifier(random_state = 10)
+
+rf_grid = GridSearchCV(estimator = random_forest_classification, 
+                       param_grid = tuned_paramaters, 
+                       cv = 3)
+
+rf_grid_model = rf_grid.fit(x_train, y_train)
+
+# *best parameters given by grid search cross validation
+
+ rf_grid_model.best_params_
+
+random_forest= RandomForestClassifier(n_estimators=50,criterion='entropy',random_state = 10,max_depth=10,max_leaf_nodes=15,min_samples_leaf=20,min_samples_split=2)
+
+
+rf = random_forest.fit(x_train,y_train)
+
+# report for train set
+
+train_pred = rf.predict(x_train)
+
+
+classification_report(y_train,train_pred)
+
+# report for test set
+
+test_pred =  rf.predict(x_test)
+
+classification_report(y_test,test_pred)
+
+# validation - confusion matrix
+
+from sklearn.metrics import confusion_matrix
+cm = confusion_matrix(y_test, test_pred)
+  
+print ("Confusion Matrix : \n", cm)
+
+from sklearn.metrics import accuracy_score
+print ("Accuracy : ", accuracy_score(y_test, test_pred))
+
+# accuracy of the above model is 66%
+
+due to storage and ram constraint,the model is build on random forest with less parameter tuning other models
+
